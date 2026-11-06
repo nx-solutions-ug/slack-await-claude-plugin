@@ -1,3 +1,4 @@
+import { compareTs } from './detect.js';
 import type { ConversationKind, SlackMessage } from './types.js';
 
 const API = 'https://slack.com/api/';
@@ -11,6 +12,15 @@ const AUTH_ERRORS = new Set([
 
 export class SlackAuthError extends Error {}
 export class SlackNetworkError extends Error {}
+/** Slack answered, but refused this request (e.g. channel_not_found). Not a connectivity problem. */
+export class SlackApiError extends Error {
+  constructor(
+    method: string,
+    public code: string,
+  ) {
+    super(`${method}: ${code}`);
+  }
+}
 export class SlackRateLimitError extends Error {
   constructor(public retryAfterSec: number) {
     super(`Slack rate limit, retry after ${retryAfterSec}s`);
@@ -67,7 +77,7 @@ export class SlackClient {
     if (!body.ok) {
       const err = String(body.error ?? 'unknown_error');
       if (AUTH_ERRORS.has(err)) throw new SlackAuthError(`${method}: ${err}`);
-      throw new SlackNetworkError(`${method}: ${err}`);
+      throw new SlackApiError(method, err);
     }
     return body;
   }
@@ -97,14 +107,58 @@ export class SlackClient {
     return c.is_im ? 'im' : c.is_mpim ? 'mpim' : 'channel';
   }
 
-  async history(channel: string, oldest: string): Promise<SlackMessage[]> {
-    const raw = await this.paged('conversations.history', { channel, oldest });
-    return raw.map(toMessage).sort((a, b) => Number(a.ts) - Number(b.ts));
+  async history(channel: string, oldest: string, latest?: string): Promise<SlackMessage[]> {
+    const raw = await this.paged('conversations.history', {
+      channel,
+      oldest,
+      ...(latest ? { latest } : {}),
+    });
+    return raw.map(toMessage).sort((a, b) => compareTs(a.ts, b.ts));
   }
 
-  async replies(channel: string, threadTs: string, oldest: string): Promise<SlackMessage[]> {
-    const raw = await this.paged('conversations.replies', { channel, ts: threadTs, oldest });
+  async replies(
+    channel: string,
+    threadTs: string,
+    oldest: string,
+    latest?: string,
+  ): Promise<SlackMessage[]> {
+    const raw = await this.paged('conversations.replies', {
+      channel,
+      ts: threadTs,
+      oldest,
+      ...(latest ? { latest } : {}),
+    });
     return raw.filter((m) => m.ts !== threadTs).map(toMessage);
+  }
+
+  /** The DM channel with a user, for messages that were sent to a user id. */
+  async dmChannelFor(userId: string): Promise<string | null> {
+    let cursor = '';
+    do {
+      const b = await this.call('users.conversations', {
+        types: 'im',
+        limit: '200',
+        ...(cursor ? { cursor } : {}),
+      });
+      const hit = ((b.channels ?? []) as Array<{ id: string; user?: string }>).find(
+        (c) => c.user === userId,
+      );
+      if (hit) return hit.id;
+      cursor = b.response_metadata?.next_cursor ?? '';
+    } while (cursor);
+    return null;
+  }
+
+  async permalink(channel: string, ts: string): Promise<string | null> {
+    try {
+      return (
+        String(
+          (await this.call('chat.getPermalink', { channel, message_ts: ts })).permalink ?? '',
+        ) || null
+      );
+    } catch {
+      return null;
+    }
   }
 
   async userName(userId: string): Promise<string> {

@@ -11,23 +11,25 @@ var QUESTION_TS_SLACK_SEC = 10;
 
 // src/detect.ts
 var TS = /^\d{9,}\.\d{6}$/;
-function findTs(v, depth = 0) {
+var CHANNEL = /^[CDG][A-Z0-9]{6,}$/;
+function findKey(v, keys, ok, depth = 0) {
   if (depth > 6 || v === null || typeof v !== "object") return null;
   for (const [k, x] of Object.entries(v)) {
-    if ((k === "ts" || k === "message_ts") && typeof x === "string" && TS.test(x)) return x;
+    if (keys.includes(k) && typeof x === "string" && ok.test(x)) return x;
   }
   for (const x of Object.values(v)) {
-    const found = findTs(x, depth + 1);
+    const found = findKey(x, keys, ok, depth + 1);
     if (found) return found;
   }
   return null;
 }
-function questionTsFromToolResponse(resp) {
-  const direct = findTs(resp);
-  if (direct) return direct;
+function parseSentMessage(resp) {
   const text = typeof resp === "string" ? resp : JSON.stringify(resp ?? "");
-  const m = /\/archives\/[A-Z0-9]+\/p(\d{10})(\d{6})/.exec(text);
-  return m ? `${m[1]}.${m[2]}` : null;
+  const link = /\/archives\/([A-Z0-9]+)\/p(\d{10})(\d{6})/.exec(text);
+  return {
+    channel: findKey(resp, ["channel", "channel_id"], CHANNEL) ?? link?.[1] ?? null,
+    ts: findKey(resp, ["ts", "message_ts"], TS) ?? (link ? `${link[2]}.${link[3]}` : null)
+  };
 }
 function slackTsFromMs(ms) {
   return `${Math.floor(ms / 1e3)}.${String(ms % 1e3 * 1e3).padStart(6, "0")}`;
@@ -61,6 +63,7 @@ function sessionDir(dataDir, sessionKey) {
 }
 
 // src/spool.ts
+var REASONS = ["done", "cancelled"];
 function writeWatch(dataDir, w) {
   const dir = sessionDir(dataDir, w.sessionKey);
   mkdirSync(dir, { recursive: true, mode: 448 });
@@ -68,6 +71,28 @@ function writeWatch(dataDir, w) {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(w), { mode: 384 });
   renameSync(tmp, file);
+}
+function readDirWatches(dir) {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const name of readdirSync(dir).sort()) {
+    if (!name.endsWith(".json")) continue;
+    try {
+      out.push(JSON.parse(readFileSync(join2(dir, name), "utf8")));
+    } catch {
+    }
+  }
+  return out;
+}
+function closedReason(dir, id) {
+  return REASONS.find((r) => existsSync(join2(dir, `${id}.${r}`))) ?? null;
+}
+function listWatches(dataDir, sessionKey) {
+  const dir = sessionDir(dataDir, sessionKey);
+  return readDirWatches(dir).map((w) => ({ ...w, closed: closedReason(dir, w.id) }));
+}
+function readActiveWatches(dataDir, sessionKey) {
+  return listWatches(dataDir, sessionKey).filter((w) => w.closed === null).map(({ closed: _closed, ...w }) => w);
 }
 
 // src/token.ts
@@ -126,25 +151,31 @@ function runHook(stdin, deps) {
     );
   }
   const now = deps.now();
-  const questionTs = questionTsFromToolResponse(input.tool_response);
-  const threadTs = input.tool_input.thread_ts ?? questionTs;
-  const w = {
+  const sent = parseSentMessage(input.tool_response);
+  const target = /^[UW]/.test(channel) && sent.channel ? sent.channel : channel;
+  const sessionKey = sessionKeyFromHook(input);
+  const threadTs = input.tool_input.thread_ts ?? sent.ts;
+  const cli = `node "${deps.pluginRoot ?? process.env.CLAUDE_PLUGIN_ROOT ?? "<plugin root>"}/dist/cli.js" --data "${deps.dataDir}"`;
+  const open = readActiveWatches(deps.dataDir, sessionKey).find(
+    (w2) => w2.channel === target && (target.startsWith("D") || w2.threadTs === threadTs)
+  );
+  const w = open ? { ...open, threadTs: threadTs ?? open.threadTs } : {
     id: deps.newId(),
-    sessionKey: sessionKeyFromHook(input),
-    channel,
-    questionTs,
+    sessionKey,
+    channel: target,
+    questionTs: sent.ts,
     threadTs,
     createdAt: now,
     kind: null,
-    lastSeenTs: questionTs ?? slackTsFromMs(now - QUESTION_TS_SLACK_SEC * 1e3),
+    lastSeenTs: sent.ts ?? slackTsFromMs(now - QUESTION_TS_SLACK_SEC * 1e3),
     pending: [],
     lastPendingAt: null,
     nextPollAt: now
   };
   writeWatch(deps.dataDir, w);
-  const where = input.tool_input.thread_ts ? "thread" : channel.startsWith("D") ? "DM" : "conversation";
+  const where = input.tool_input.thread_ts ? "thread" : target.startsWith("D") ? "DM" : "conversation";
   return context(
-    `slack-await: watching ${where} ${channel} for replies (watch ${w.id}, session ${w.sessionKey}). Do not poll Slack yourself; end the turn when you are waiting.`
+    `slack-await: ${open ? "already watching" : "watching"} ${where} ${target} for replies (watch ${w.id}, session ${sessionKey}). Do not poll Slack yourself; end the turn when you are waiting. When you have used the answer, close the watch: ${cli} done ${w.id} \u2014 list this session's watches: ${cli} list --session ${sessionKey}`
   );
 }
 var newWatchId = () => `w${BigInt(`0x${randomBytes(5).toString("hex")}`).toString(36).padStart(6, "0").slice(-6)}`;

@@ -10,7 +10,7 @@ This plugin watches the Slack conversations this session posts in. When a collea
 ## When you ask
 
 - Ask one clear, answerable question. Say which issue or task it is about, so the answer makes sense on its own.
-- Send it with the Slack connector's send tool, as usual. A `slack-await: watching …` line appears right after; it names the watch id and the session key. Remember both.
+- Send it with the Slack connector's send tool, as usual. A `slack-await: watching …` line appears right after; it names the watch id and the session key and gives the exact commands to close and list watches. Remember them.
 - If instead it says the reply will **NOT** wake this session, tell the developer plainly and suggest `/slack-await:setup`.
 - Then **end the turn**. Do not poll Slack, do not start a Monitor, do not sleep. If other work on the task doesn't depend on the answer, you may do that first.
 
@@ -27,7 +27,7 @@ Never message the colleague beyond what the work needs. No automatic "thanks, go
 
 ## Closing a watch
 
-As soon as you have used the answer, mark the watch done, so later chatter in that conversation doesn't wake the session:
+As soon as you have used the answer, mark the watch done, so later chatter in that conversation doesn't wake the session. Use the exact `done` command from the `slack-await: watching …` line; it has the paths filled in. Its general form:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" --data "${CLAUDE_PLUGIN_DATA}" done <watch-id>

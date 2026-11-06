@@ -39,6 +39,12 @@ class FakeSlack {
     this.guard('conversations.replies');
     return this.thread.filter((m) => Number(m.ts) > Number(oldest));
   }
+  async permalink(_c: string, _ts: string) {
+    return null;
+  }
+  async dmChannelFor(_u: string) {
+    return null;
+  }
   async userName(id: string) {
     this.guard('users.info');
     return id === 'U0TEST0002' ? 'Alex Example' : id;

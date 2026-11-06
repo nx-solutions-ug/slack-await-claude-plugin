@@ -3,6 +3,15 @@
 // src/cli.ts
 import { createInterface } from "readline";
 
+// src/detect.ts
+function compareTs(a, b) {
+  const [as, au = ""] = a.split(".");
+  const [bs, bu = ""] = b.split(".");
+  const x = BigInt(as + au.padEnd(6, "0"));
+  const y = BigInt(bs + bu.padEnd(6, "0"));
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 // src/slack.ts
 var API = "https://slack.com/api/";
 var AUTH_ERRORS = /* @__PURE__ */ new Set([
@@ -15,6 +24,13 @@ var AUTH_ERRORS = /* @__PURE__ */ new Set([
 var SlackAuthError = class extends Error {
 };
 var SlackNetworkError = class extends Error {
+};
+var SlackApiError = class extends Error {
+  constructor(method, code) {
+    super(`${method}: ${code}`);
+    this.code = code;
+  }
+  code;
 };
 var SlackRateLimitError = class extends Error {
   constructor(retryAfterSec) {
@@ -63,7 +79,7 @@ var SlackClient = class {
     if (!body.ok) {
       const err = String(body.error ?? "unknown_error");
       if (AUTH_ERRORS.has(err)) throw new SlackAuthError(`${method}: ${err}`);
-      throw new SlackNetworkError(`${method}: ${err}`);
+      throw new SlackApiError(method, err);
     }
     return body;
   }
@@ -89,13 +105,48 @@ var SlackClient = class {
     const c = (await this.call("conversations.info", { channel })).channel ?? {};
     return c.is_im ? "im" : c.is_mpim ? "mpim" : "channel";
   }
-  async history(channel, oldest) {
-    const raw = await this.paged("conversations.history", { channel, oldest });
-    return raw.map(toMessage).sort((a, b) => Number(a.ts) - Number(b.ts));
+  async history(channel, oldest, latest) {
+    const raw = await this.paged("conversations.history", {
+      channel,
+      oldest,
+      ...latest ? { latest } : {}
+    });
+    return raw.map(toMessage).sort((a, b) => compareTs(a.ts, b.ts));
   }
-  async replies(channel, threadTs, oldest) {
-    const raw = await this.paged("conversations.replies", { channel, ts: threadTs, oldest });
+  async replies(channel, threadTs, oldest, latest) {
+    const raw = await this.paged("conversations.replies", {
+      channel,
+      ts: threadTs,
+      oldest,
+      ...latest ? { latest } : {}
+    });
     return raw.filter((m) => m.ts !== threadTs).map(toMessage);
+  }
+  /** The DM channel with a user, for messages that were sent to a user id. */
+  async dmChannelFor(userId) {
+    let cursor = "";
+    do {
+      const b = await this.call("users.conversations", {
+        types: "im",
+        limit: "200",
+        ...cursor ? { cursor } : {}
+      });
+      const hit = (b.channels ?? []).find(
+        (c) => c.user === userId
+      );
+      if (hit) return hit.id;
+      cursor = b.response_metadata?.next_cursor ?? "";
+    } while (cursor);
+    return null;
+  }
+  async permalink(channel, ts) {
+    try {
+      return String(
+        (await this.call("chat.getPermalink", { channel, message_ts: ts })).permalink ?? ""
+      ) || null;
+    } catch {
+      return null;
+    }
   }
   async userName(userId) {
     const cached = this.names.get(userId);
@@ -184,7 +235,16 @@ function keychainRead(d) {
   return r.status === 0 && v ? v : null;
 }
 function keychainWrite(token, d) {
-  const r = d.platform === "darwin" ? d.run("security", ["add-generic-password", "-U", "-s", SERVICE, "-a", ACCOUNT, "-w", token]) : d.run(
+  if (!/^[A-Za-z0-9-]+$/.test(token)) return false;
+  const r = d.platform === "darwin" ? (
+    // `security -i` reads the command from stdin, so the token never appears in argv / ps.
+    d.run(
+      "security",
+      ["-i"],
+      `add-generic-password -U -s ${SERVICE} -a ${ACCOUNT} -w ${token}
+`
+    )
+  ) : d.run(
     "secret-tool",
     ["store", "--label", SERVICE, "service", SERVICE, "account", ACCOUNT],
     token

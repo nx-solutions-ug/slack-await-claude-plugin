@@ -36,9 +36,15 @@ function keychainRead(d: TokenDeps): string | null {
 }
 
 function keychainWrite(token: string, d: TokenDeps): boolean {
+  if (!/^[A-Za-z0-9-]+$/.test(token)) return false;
   const r =
     d.platform === 'darwin'
-      ? d.run('security', ['add-generic-password', '-U', '-s', SERVICE, '-a', ACCOUNT, '-w', token])
+      ? // `security -i` reads the command from stdin, so the token never appears in argv / ps.
+        d.run(
+          'security',
+          ['-i'],
+          `add-generic-password -U -s ${SERVICE} -a ${ACCOUNT} -w ${token}\n`,
+        )
       : d.run(
           'secret-tool',
           ['store', '--label', SERVICE, 'service', SERVICE, 'account', ACCOUNT],

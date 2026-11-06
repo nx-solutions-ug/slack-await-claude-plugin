@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { newReplies, questionTsFromToolResponse, slackTsFromMs } from '../src/detect.js';
+import { newReplies, parseSentMessage, slackTsFromMs } from '../src/detect.js';
 import type { SlackMessage } from '../src/types.js';
 import { makeWatch } from './helpers.js';
 
@@ -72,9 +72,7 @@ describe('newReplies', () => {
 
 describe('question ts', () => {
   test('from a ts field', () => {
-    expect(questionTsFromToolResponse({ ok: true, ts: '1730900000.123456' })).toBe(
-      '1730900000.123456',
-    );
+    expect(parseSentMessage({ ok: true, ts: '1730900000.123456' }).ts).toBe('1730900000.123456');
   });
   test('from a permalink in text content', () => {
     const resp = [
@@ -83,11 +81,11 @@ describe('question ts', () => {
         text: 'Sent: https://example.slack.com/archives/D0TEST0001/p1730900000123456',
       },
     ];
-    expect(questionTsFromToolResponse(resp)).toBe('1730900000.123456');
+    expect(parseSentMessage(resp).ts).toBe('1730900000.123456');
   });
   test('unknown shape gives null', () => {
-    expect(questionTsFromToolResponse({})).toBeNull();
-    expect(questionTsFromToolResponse('done')).toBeNull();
+    expect(parseSentMessage({}).ts).toBeNull();
+    expect(parseSentMessage('done').ts).toBeNull();
   });
   test('slackTsFromMs', () => {
     expect(slackTsFromMs(1_730_900_000_123)).toBe('1730900000.123000');

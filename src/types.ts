@@ -27,6 +27,8 @@ export interface Watch {
   pending: SlackMessage[];
   lastPendingAt: number | null;
   nextPollAt: number;
+  /** The fallback search for the question ts has been tried (it runs once). */
+  questionLookupDone?: boolean;
 }
 
 export type CloseReason = 'done' | 'cancelled';

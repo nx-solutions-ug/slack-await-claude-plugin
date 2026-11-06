@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { QUESTION_TS_SLACK_SEC } from './constants.js';
-import { questionTsFromToolResponse, slackTsFromMs } from './detect.js';
+import { parseSentMessage, slackTsFromMs } from './detect.js';
 import { sessionKeyFromHook } from './session.js';
-import { writeWatch } from './spool.js';
+import { readActiveWatches, writeWatch } from './spool.js';
 import { readToken } from './token.js';
 import type { Watch } from './types.js';
 
@@ -12,6 +12,8 @@ export interface HookDeps {
   now(): number;
   tokenPresent(): boolean;
   newId(): string;
+  /** Where dist/cli.js lives; defaults to CLAUDE_PLUGIN_ROOT. */
+  pluginRoot?: string;
 }
 
 const SEND_TOOL = /^mcp__.*slack.*__(slack_)?send_message$/i;
@@ -44,29 +46,40 @@ export function runHook(stdin: string, deps: HookDeps): string {
     );
   }
   const now = deps.now();
-  const questionTs = questionTsFromToolResponse(input.tool_response);
-  const threadTs: string | null = input.tool_input.thread_ts ?? questionTs;
-  const w: Watch = {
-    id: deps.newId(),
-    sessionKey: sessionKeyFromHook(input as { session_id: string }),
-    channel,
-    questionTs,
-    threadTs,
-    createdAt: now,
-    kind: null,
-    lastSeenTs: questionTs ?? slackTsFromMs(now - QUESTION_TS_SLACK_SEC * 1000),
-    pending: [],
-    lastPendingAt: null,
-    nextPollAt: now,
-  };
+  const sent = parseSentMessage(input.tool_response);
+  // A DM sent to a user id: the real conversation is the D… channel in the response.
+  const target = /^[UW]/.test(channel) && sent.channel ? sent.channel : channel;
+  const sessionKey = sessionKeyFromHook(input as { session_id: string });
+  const threadTs: string | null = input.tool_input.thread_ts ?? sent.ts;
+  const cli = `node "${deps.pluginRoot ?? process.env.CLAUDE_PLUGIN_ROOT ?? '<plugin root>'}/dist/cli.js" --data "${deps.dataDir}"`;
+
+  // A second question in the same conversation reuses the open watch, so one reply wakes once.
+  const open = readActiveWatches(deps.dataDir, sessionKey).find(
+    (w) => w.channel === target && (target.startsWith('D') || w.threadTs === threadTs),
+  );
+  const w: Watch = open
+    ? { ...open, threadTs: threadTs ?? open.threadTs }
+    : {
+        id: deps.newId(),
+        sessionKey,
+        channel: target,
+        questionTs: sent.ts,
+        threadTs,
+        createdAt: now,
+        kind: null,
+        lastSeenTs: sent.ts ?? slackTsFromMs(now - QUESTION_TS_SLACK_SEC * 1000),
+        pending: [],
+        lastPendingAt: null,
+        nextPollAt: now,
+      };
   writeWatch(deps.dataDir, w);
   const where = input.tool_input.thread_ts
     ? 'thread'
-    : channel.startsWith('D')
+    : target.startsWith('D')
       ? 'DM'
       : 'conversation';
   return context(
-    `slack-await: watching ${where} ${channel} for replies (watch ${w.id}, session ${w.sessionKey}). Do not poll Slack yourself; end the turn when you are waiting.`,
+    `slack-await: ${open ? 'already watching' : 'watching'} ${where} ${target} for replies (watch ${w.id}, session ${sessionKey}). Do not poll Slack yourself; end the turn when you are waiting. When you have used the answer, close the watch: ${cli} done ${w.id} — list this session's watches: ${cli} list --session ${sessionKey}`,
   );
 }
 

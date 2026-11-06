@@ -36,25 +36,28 @@ export function newReplies(
 }
 
 const TS = /^\d{9,}\.\d{6}$/;
+const CHANNEL = /^[CDG][A-Z0-9]{6,}$/;
 
-function findTs(v: unknown, depth = 0): string | null {
+function findKey(v: unknown, keys: string[], ok: RegExp, depth = 0): string | null {
   if (depth > 6 || v === null || typeof v !== 'object') return null;
   for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
-    if ((k === 'ts' || k === 'message_ts') && typeof x === 'string' && TS.test(x)) return x;
+    if (keys.includes(k) && typeof x === 'string' && ok.test(x)) return x;
   }
   for (const x of Object.values(v as Record<string, unknown>)) {
-    const found = findTs(x, depth + 1);
+    const found = findKey(x, keys, ok, depth + 1);
     if (found) return found;
   }
   return null;
 }
 
-export function questionTsFromToolResponse(resp: unknown): string | null {
-  const direct = findTs(resp);
-  if (direct) return direct;
+/** Channel and ts of the message the send tool just posted, from its response (JSON fields or a permalink). */
+export function parseSentMessage(resp: unknown): { channel: string | null; ts: string | null } {
   const text = typeof resp === 'string' ? resp : JSON.stringify(resp ?? '');
-  const m = /\/archives\/[A-Z0-9]+\/p(\d{10})(\d{6})/.exec(text);
-  return m ? `${m[1]}.${m[2]}` : null;
+  const link = /\/archives\/([A-Z0-9]+)\/p(\d{10})(\d{6})/.exec(text);
+  return {
+    channel: findKey(resp, ['channel', 'channel_id'], CHANNEL) ?? link?.[1] ?? null,
+    ts: findKey(resp, ['ts', 'message_ts'], TS) ?? (link ? `${link[2]}.${link[3]}` : null),
+  };
 }
 
 export function slackTsFromMs(ms: number): string {

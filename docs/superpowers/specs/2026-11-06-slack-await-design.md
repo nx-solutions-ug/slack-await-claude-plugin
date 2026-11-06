@@ -120,7 +120,7 @@ Reply text is truncated to a sensible length with a pointer ("… full thread: <
 
 ### 6.7 Runtime constraints
 
-- No install step runs when a plugin is installed, so everything that runs must be **dependency-free at runtime**: a bundled single-file JS in `dist/` (built with tsup/bun, committed), requiring only `node` on `PATH`. Sources in `src/`, tests in `test/`.
+- No install step runs when a plugin is installed, so everything that runs must be **dependency-free at runtime**: a bundled single-file JS in `dist/` (built with tsup/bun, committed), requiring only `node` (**Node 26 or later**) on `PATH`. Sources in `src/`, tests in `test/`.
 - Hook matcher must not hardcode the connector name (`claude_ai_Slack` differs per install): match Slack send tools by pattern, e.g. `mcp__.*[Ss]lack.*__.*send_message`. Scheduled messages and drafts are not watched in v1 (a draft is not sent; a scheduled message has no ts yet).
 - Polling: default every 60 s per active watch, backing off for watches older than a few hours (e.g. to 5 min). Respect `Retry-After` on HTTP 429.
 - Failure is loud, once: token invalid or revoked, repeated network failure, or rate limiting beyond a threshold → one `[slack-await] error …` line, then stay quiet until it recovers (and say so once when it does).

@@ -1,0 +1,22 @@
+# Slack app for slack-await. Create it at https://api.slack.com/apps?new_app=1 → "From a manifest".
+# It has no bot and no event subscriptions: it only lets your own Claude Code sessions
+# read replies in conversations you are already part of, using your own user token.
+display_information:
+  name: slack-await
+  description: Lets my Claude Code sessions notice replies to questions they asked in Slack.
+oauth_config:
+  scopes:
+    user:
+      - channels:history
+      - channels:read
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - mpim:history
+      - mpim:read
+      - users:read
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

@@ -5,8 +5,8 @@ const SID = 'b51f7267-0caf-4dcc-9159-00de5b55a2a4';
 
 describe('session key', () => {
   test('hook and watcher of the same session agree', () => {
-    expect(sessionKeyFromHook({ session_id: SID })).toBe(
-      sessionKeyForWatcher({ CLAUDE_CODE_SESSION_ID: SID }),
+    expect(sessionKeyForWatcher({ CLAUDE_CODE_SESSION_ID: SID })).toBe(
+      sessionKeyFromHook({ session_id: SID }),
     );
   });
 

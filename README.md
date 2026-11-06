@@ -23,3 +23,7 @@ bun run build       # bundles src/ into plugins/slack-await/dist/ (committed)
 The plugin runs the committed bundle in `plugins/slack-await/dist/`; CI fails if it doesn't match a fresh build of `src/`. Design and plan: [`docs/superpowers/`](docs/superpowers/).
 
 License: MIT
+
+## Releases
+
+Pushing to `main` runs [semantic-release](https://semantic-release.gitbook.io/): conventional commits decide the next version, which is written into both manifests and tagged `v<version>`. The workflow needs two repository secrets for the GitHub App that pushes the release commit: `APP_CLIENT_ID` and `APP_PRIVATE_KEY`.

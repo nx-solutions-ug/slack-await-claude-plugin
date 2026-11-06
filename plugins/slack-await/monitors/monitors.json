@@ -1,0 +1,8 @@
+[
+  {
+    "name": "slack-replies",
+    "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/dist/watcher.js --data \"${CLAUDE_PLUGIN_DATA}\"",
+    "description": "Slack replies to questions this session asked",
+    "when": "always"
+  }
+]

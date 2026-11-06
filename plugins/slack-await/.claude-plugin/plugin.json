@@ -1,0 +1,14 @@
+{
+  "name": "slack-await",
+  "displayName": "Slack Await",
+  "version": "0.1.0",
+  "description": "When Claude asks a colleague something in Slack, the session waits and is woken automatically when they reply.",
+  "author": {
+    "name": "NX Solutions UG",
+    "url": "https://github.com/nx-solutions-ug"
+  },
+  "homepage": "https://github.com/nx-solutions-ug/slack-await-claude-plugin",
+  "repository": "https://github.com/nx-solutions-ug/slack-await-claude-plugin",
+  "license": "MIT",
+  "keywords": ["slack", "async", "human-in-the-loop", "notifications", "productivity"]
+}

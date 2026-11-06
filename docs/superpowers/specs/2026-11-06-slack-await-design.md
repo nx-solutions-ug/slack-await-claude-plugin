@@ -113,14 +113,14 @@ Reply text is truncated to a sensible length with a pointer ("… full thread: <
 ### 6.6 Setup and credentials
 
 - The repo ships `slack-app-manifest.yaml`: a Slack app with **user token scopes** `channels:history`, `groups:history`, `im:history`, `mpim:history` (and `users:read` if display names are resolved). No bot user, no Socket Mode, no event subscriptions.
-- **Each person creates their own app from the manifest** in their workspace (about a minute), installs it, and copies their user token (`xoxp-…`). The setup skill walks them through it and verifies the token with `auth.test`. *(Author's call — see §10.)*
+- **Each person creates their own app from the manifest** in their workspace (about a minute), installs it, and copies their user token (`xoxp-…`). The setup skill walks them through it and verifies the token with `auth.test`. _(Author's call — see §10.)_
 - An internal, single-workspace, non-distributed app is exempt from Slack's 2025/2026 rate-limit reduction for non-Marketplace apps (Slack: "internal customer-built applications should not see rate limit changes"), so ordinary Tier 3 limits apply to `conversations.history` / `conversations.replies`.
 - **One workspace, one identity.** v1 assumes one Slack workspace per user. Setup checks that the token's user (`auth.test`) is the same user the Slack connector acts as (the connector's own "who am I" / current-user profile tool), and refuses with a clear message if they differ. Otherwise the watcher would read the wrong workspace or mistake the developer's own messages for replies.
-- **Token storage:** plugin `userConfig` with `sensitive: true` is *not* usable here, because monitor processes receive neither `CLAUDE_PLUGIN_OPTION_*` nor `${user_config.*}`. The setup stores the token in the OS keychain where available (libsecret/`secret-tool`, macOS `security`), falling back to `~/.config/slack-await/token` with mode 0600. The watcher and the hook read it from there. Never in `${CLAUDE_PLUGIN_ROOT}`, never in a project.
+- **Token storage:** plugin `userConfig` with `sensitive: true` is _not_ usable here, because monitor processes receive neither `CLAUDE_PLUGIN_OPTION_*` nor `${user_config.*}`. The setup stores the token in the OS keychain where available (libsecret/`secret-tool`, macOS `security`), falling back to `~/.config/slack-await/token` with mode 0600. The watcher and the hook read it from there. Never in `${CLAUDE_PLUGIN_ROOT}`, never in a project.
 
 ### 6.7 Runtime constraints
 
-- No install step runs when a plugin is installed, so everything that runs must be **dependency-free at runtime**: a bundled single-file JS in `dist/` (built with tsup/bun, committed), requiring only `node` on `PATH`. Sources in `src/`, tests in `test/`.
+- No install step runs when a plugin is installed, so everything that runs must be **dependency-free at runtime**: a bundled single-file JS in `dist/` (built with tsup/bun, committed), requiring only `node` (**Node 26 or later**) on `PATH`. Sources in `src/`, tests in `test/`.
 - Hook matcher must not hardcode the connector name (`claude_ai_Slack` differs per install): match Slack send tools by pattern, e.g. `mcp__.*[Ss]lack.*__.*send_message`. Scheduled messages and drafts are not watched in v1 (a draft is not sent; a scheduled message has no ts yet).
 - Polling: default every 60 s per active watch, backing off for watches older than a few hours (e.g. to 5 min). Respect `Retry-After` on HTTP 429.
 - Failure is loud, once: token invalid or revoked, repeated network failure, or rate limiting beyond a threshold → one `[slack-await] error …` line, then stay quiet until it recovers (and say so once when it does).
@@ -143,7 +143,7 @@ These come from gaps in the documentation; each one can change the design.
    - **(a)** if the monitor can see the session id → key the spool by session id;
    - **(b)** otherwise, if hook and monitor share an identifiable ancestor (the Claude Code process of that session, found by walking parent pids) → key the spool by that process id; the hook records it next to the session id;
    - **(c)** if neither works → stop and bring it back to the developer. A per-directory spool with "the skill ignores events for other sessions" is **not** acceptable, because it breaks the strict guarantee.
-   The spike also confirms monitor lifetime: what happens to the process when the session ends, and that the watcher's parent-gone check (§6.7) reaps it.
+     The spike also confirms monitor lifetime: what happens to the process when the session ends, and that the watcher's parent-gone check (§6.7) reaps it.
 2. **Monitor output wakes an idle session** the same way the Monitor tool does, and is queued while the session is busy.
 3. **What the Slack send tool returns** in `tool_response` (ts / permalink of the sent message). If unreliable, the hook (or the watcher on first poll) finds the developer's latest message in that channel via `conversations.history`.
 4. **Resume.** Whether a resumed session (`--resume` / `--continue`) restarts the monitor with the same session id, so open watches carry over. Nice to have, not required for v1.

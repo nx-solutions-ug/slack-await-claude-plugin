@@ -1,0 +1,9 @@
+export const SPOOL_TICK_MS = 5_000;
+export const POLL_FRESH_MS = 60_000;
+export const POLL_OLD_MS = 300_000;
+export const OLD_AFTER_MS = 3 * 3_600_000;
+export const QUIET_MS = 75_000;
+export const EXPIRE_MS = 7 * 86_400_000;
+export const ERROR_THRESHOLD = 3;
+export const MAX_EVENT_TEXT = 600;
+export const QUESTION_TS_SLACK_SEC = 10;

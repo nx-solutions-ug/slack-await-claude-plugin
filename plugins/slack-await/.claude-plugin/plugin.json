@@ -1,7 +1,7 @@
 {
   "name": "slack-await",
   "displayName": "Slack Await",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "When Claude asks a colleague something in Slack, the session waits and is woken automatically when they reply.",
   "author": {
     "name": "NX Solutions UG",

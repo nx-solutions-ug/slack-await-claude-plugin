@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*[Ss]lack.*__(slack_)?send_message$",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/dist/hook.js" }]
+      }
+    ]
+  }
+}

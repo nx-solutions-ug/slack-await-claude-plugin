@@ -351,10 +351,7 @@ async function poll(w, slack, self, now) {
   const top = next.kind === "im" || next.kind === "mpim" ? await slack.history(next.channel, next.lastSeenTs, latest) : [];
   const evaluated = maxTs(next.lastSeenTs, [...thread, ...top]);
   next = addToBurst(next, newReplies(next, thread, top, self), now);
-  next.lastSeenTs = maxTs(
-    evaluated,
-    next.pending.length ? [{ ts: next.lastSeenTs, text: "" }] : []
-  );
+  next.lastSeenTs = evaluated;
   next.nextPollAt = now + (now - next.createdAt > OLD_AFTER_MS ? POLL_OLD_MS : POLL_FRESH_MS);
   return next;
 }

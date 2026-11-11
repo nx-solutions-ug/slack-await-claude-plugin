@@ -13,7 +13,7 @@ concurrency:
 jobs:
   type-check:
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork || !contains(fromJSON('["","OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association || '') || (github.run_attempt == 1 && vars.SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","coolify"]') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -25,7 +25,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork || !contains(fromJSON('["","OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association || '') || (github.run_attempt == 1 && vars.SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","coolify"]') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -38,7 +38,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork || !contains(fromJSON('["","OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association || '') || (github.run_attempt == 1 && vars.SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","coolify"]') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -53,7 +53,7 @@ jobs:
 
   dist:
     name: Built code matches sources
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork || !contains(fromJSON('["","OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association || '') || (github.run_attempt == 1 && vars.SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","coolify"]') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7

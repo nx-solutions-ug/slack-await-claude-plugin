@@ -1,4 +1,6 @@
-# slack-await plugin for Claude Code
+<p align="center">
+  <img src="assets/banner-readme.png" alt="Slack Await Plugin" width="850" />
+</p>
 
 Claude Code plugin marketplace for **slack-await**: when Claude asks a colleague something in Slack, the waiting session is woken automatically when they reply.
 

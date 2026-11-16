@@ -31,7 +31,7 @@
     "@types/node": "^26.0.0",
     "oxfmt": "^0.78.0",
     "oxlint": "^1.82.0",
-    "semantic-release": "^25.0.0",
+    "semantic-release": "^26.0.0",
     "tsup": "^9.0.0",
     "typescript": "^6.0.0"
   },
